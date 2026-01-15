@@ -1,0 +1,43 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: webhook-api
+    ports:
+      - "${PORT:-8000}:${PORT:-8000}"
+    volumes:
+      - db-data:/data
+    env_file:
+      - .env
+    environment:
+      PORT: ${PORT:-8000}
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////data/app.db}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+      UVICORN_CMD: ${UVICORN_CMD:---reload}
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; import os; urllib.request.urlopen(f'http://localhost:{os.environ.get(\"PORT\", 8000)}/health/live')"
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    develop:
+      watch:
+        # Rebuild when requirements change
+        - action: rebuild
+          path: requirements.txt
+        # Sync app code changes (hot reload with uvicorn --reload)
+        - action: sync
+          path: ./app
+          target: /app/app
+
+volumes:
+  db-data:
